@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Добавление занятия</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Добавляем шапку -->
+    <header class="header">
+        <img src="header-logo.png" alt="Логотип" class="header-logo">
+    </header>
+
+    <div class="nav">
+        <a href="index.html" class="active">Добавить занятие</a>
+        <a href="lessons_list.html">Список занятий</a>
+    </div>
+    <div class="form-container">
+        <h2>Добавить новое занятие</h2>
+        <form id="lessonForm">
+            <div class="form-group">
+                <label>Дата занятия:</label>
+                <input type="date" id="lesson_date" required>
+            </div>
+            
+            <div class="form-group">
+                <label>Время занятия:</label>
+                <input type="time" id="lesson_time" required>
+            </div>
+
+            <div class="form-group">
+                <label>Номер задания:</label>
+                <input type="text" id="assignment_number" required>
+            </div>
+
+            <div class="form-group">
+                <label>Описание задания:</label>
+                <textarea id="assignment_description"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Путь к вложению:</label>
+                <input type="text" id="attachment_path">
+            </div>
+
+            <div class="form-group">
+                <label>Срок выполнения:</label>
+                <input type="date" id="assignment_deadline">
+            </div>
+
+            <div class="form-group">
+                <label>Группа:</label>
+                <select id="group_id" required>
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Дисциплина:</label>
+                <select id="subject_id" required>
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+
+            <button type="submit">Добавить занятие</button>
+        </form>
+        <div id="message" class="error"></div>
+    </div>
+
+<script>
+    const API_BASE = 'http://localhost:8000';
+
+    // Загрузка групп и предметов при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        loadGroups();
+        loadSubjects();
+    });
+
+    // Загрузка списка групп
+    async function loadGroups() {
+        try {
+            const response = await fetch(`${API_BASE}/groups`);
+            if (!response.ok) throw new Error('Network error');
+            const groups = await response.json();
+            const select = document.getElementById('group_id');
+            select.innerHTML = '<option value="">Выберите группу</option>';
+            groups.forEach(group => {
+                select.innerHTML += `<option value="${group.group_id}">${group.group_name}</option>`;
+            });
+        } catch (error) {
+            console.error('Ошибка загрузки групп:', error);
+            showMessage('Ошибка загрузки списка групп', 'error');
+        }
+    }
+
+    // Загрузка списка предметов
+    async function loadSubjects() {
+        try {
+            const response = await fetch(`${API_BASE}/subjects`);
+            if (!response.ok) throw new Error('Network error');
+            const subjects = await response.json();
+            const select = document.getElementById('subject_id');
+            select.innerHTML = '<option value="">Выберите предмет</option>';
+            subjects.forEach(subject => {
+                select.innerHTML += `<option value="${subject.subject_id}">${subject.subject_name}</option>`;
+            });
+        } catch (error) {
+            console.error('Ошибка загрузки предметов:', error);
+            showMessage('Ошибка загрузки списка предметов', 'error');
+        }
+    }
+
+    // Обработка отправки формы
+document.getElementById('lessonForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const lessonData = {
+        lesson_date: document.getElementById('lesson_date').value,
+        lesson_time: document.getElementById('lesson_time').value,
+        assignment_number: document.getElementById('assignment_number').value,
+        assignment_description: document.getElementById('assignment_description').value || null,
+        attachment_path: document.getElementById('attachment_path').value || null,
+        assignment_deadline: document.getElementById('assignment_deadline').value || null,
+        group_id: parseInt(document.getElementById('group_id').value),
+        subject_id: parseInt(document.getElementById('subject_id').value)
+    };
+
+    console.log('Отправка данных:', lessonData); // Для отладки
+
+    try {
+        const response = await fetch(`${API_BASE}/lessons`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(lessonData)
+        });
+
+        console.log('Статус ответа:', response.status); // Для отладки
+
+        if (response.ok) {
+            const result = await response.json();
+            showMessage('Занятие успешно добавлено! ID: ' + result.lesson_id, 'success');
+            this.reset();
+        } else {
+            // Пытаемся прочитать ошибку
+            try {
+                const errorData = await response.json();
+                showMessage(`Ошибка сервера: ${errorData.detail}`, 'error');
+            } catch (parseError) {
+                showMessage(`Ошибка: ${response.status} ${response.statusText}`, 'error');
+            }
+        }
+    } catch (error) {
+        console.error('Полная ошибка:', error);
+        showMessage('Сетевая ошибка: ' + error.message, 'error');
+    }
+});
+
+    function showMessage(text, type) {
+        const msg = document.getElementById('message');
+        msg.textContent = text;
+        msg.className = type;
+        setTimeout(() => msg.textContent = '', 5000);
+    }
+</script>
+</body>
+</html>

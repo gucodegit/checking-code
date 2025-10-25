@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0"> -->
+    <title>Список занятий - Алгоритмизация и программирование</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="nav">
+        <a href="index.html">Добавить занятие</a>
+        <a href="lessons_list.html" class="active">Список занятий</a>
+    </div>
+
+    <div class="form-container">
+        <h2>Список занятий</h2>
+        <h3>Дисциплина: Алгоритмизация и программирование</h3>
+       
+        <div class="stats" id="statsInfo">
+            <!-- Статистика будет здесь -->
+        </div>
+
+        <div class="filters">
+            <div class="form-group">
+                <label>Выберите группу:</label>
+                <select id="groupFilter" required>
+                    <option value="">Выберите группу...</option>
+                </select>
+            </div>
+        </div>
+        <table class="lessons-table" id="lessonsTable">
+            <thead>
+                <tr>
+                    <th>Дата занятия</th>
+                    <th>Номер задания</th>
+                    <th>Описание задания</th>
+                    <th>Срок выполнения</th>
+                    <th>Материалы</th>
+                </tr>
+            </thead>
+            <tbody id="lessonsTableBody">
+                <!-- Данные будут здесь -->
+            </tbody>
+        </table>
+
+        <div id="emptyMessage" class="empty-state" style="display: none;">
+            <p>Нет занятий для выбранной группы</p>
+            <p><small>Выберите другую группу или добавьте новые занятия</small></p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const FIXED_SUBJECT = 'Алгоритмизация и программирование';
+        let allLessons = [];
+        let filteredLessons = [];
+
+        // Загрузка данных при открытии страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGroups();
+            loadLessons();
+        });
+
+        // Загрузка списка групп
+        async function loadGroups() {
+            try {
+                const response = await fetch(`${API_BASE}/groups`);
+                if (!response.ok) throw new Error('Network error');
+                const groups = await response.json();
+                const select = document.getElementById('groupFilter');
+                groups.forEach(group => {
+                    select.innerHTML += `<option value="${group.group_id}">${group.group_name}</option>`;
+                });
+            } catch (error) {
+                console.error('Ошибка загрузки групп:', error);
+            }
+        }
+
+        // Загрузка списка занятий
+        async function loadLessons() {
+            try {
+                const response = await fetch(`${API_BASE}/lessons-detailed`);
+                if (!response.ok) throw new Error('Network error');
+                allLessons = await response.json();
+                updateStats();
+            } catch (error) {
+                console.error('Ошибка загрузки занятий:', error);
+            }
+        }
+
+        // Применение фильтров
+        function applyFilters() {
+            const selectedGroupId = parseInt(document.getElementById('groupFilter').value);
+            
+            if (!selectedGroupId) {
+                filteredLessons = [];
+                displayLessons();
+                return;
+            }
+
+            // Имя выбранной группы
+            const groupSelect = document.getElementById('groupFilter');
+            const selectedGroupName = groupSelect.options[groupSelect.selectedIndex].text;
+
+            // Фильтр по группе и предмету
+            filteredLessons = allLessons.filter(lesson => {
+                const matchesGroup = lesson.group_name === selectedGroupName;
+                const matchesSubject = lesson.subject_name === FIXED_SUBJECT;
+                return matchesGroup && matchesSubject;
+            });
+
+            displayLessons();
+            updateStats();
+        }
+
+        // Отображение занятий
+        function displayLessons() {
+            const tbody = document.getElementById('lessonsTableBody');
+            const emptyMessage = document.getElementById('emptyMessage');
+            const table = document.getElementById('lessonsTable');
+
+            if (filteredLessons.length === 0) {
+                tbody.innerHTML = '';
+                table.style.display = 'none';
+                emptyMessage.style.display = 'block';
+                return;
+            }
+
+            table.style.display = 'table';
+            emptyMessage.style.display = 'none';
+
+            tbody.innerHTML = filteredLessons.map(lesson => {
+                const today = new Date();
+                const deadline = lesson.assignment_deadline ? new Date(lesson.assignment_deadline) : null;
+                const isOverdue = deadline && deadline < today;
+                const deadlineClass = isOverdue ? 'deadline-warning' : 'deadline-normal';
+                const deadlineText = deadline ? 
+                    `<span class="${deadlineClass}">${formatDate(deadline)}</span>` : 
+                    '<span style="color: #666;">Не указан</span>';
+
+                const description = lesson.assignment_description || 
+                    '<span style="color: #666; font-style: italic;">Описание отсутствует</span>';
+
+                const attachment = lesson.attachment_path ? 
+                    `<a href="${lesson.attachment_path}" class="attachment-link" target="_blank">📎 Скачать</a>` : 
+                    '<span style="color: #666;">—</span>';
+
+                return `
+                    <tr>
+                        <td><strong>${formatDate(new Date(lesson.lesson_date))}</strong></td>
+                        <td><strong>${lesson.assignment_number}</strong></td>
+                        <td class="assignment-description">${description}</td>
+                        <td>${deadlineText}</td>
+                        <td>${attachment}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Обновление статистики
+        function updateStats() {
+            const selectedGroupId = parseInt(document.getElementById('groupFilter').value);
+            const statsElement = document.getElementById('statsInfo');
+            
+            if (!selectedGroupId) {
+                statsElement.innerHTML = `<strong>Статистика:</strong>`;
+                return;
+            }
+
+            const groupSelect = document.getElementById('groupFilter');
+            const selectedGroupName = groupSelect.options[groupSelect.selectedIndex].text;
+            const totalLessons = filteredLessons.length;
+            statsElement.innerHTML = `
+                <strong>Группа:</strong> ${selectedGroupName} | 
+                <strong>Всего занятий:</strong> ${totalLessons} 
+            `;
+        }
+
+        // Форматирование даты
+        function formatDate(date) {
+            return date.toLocaleDateString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+
+        // Обработчики событий
+        document.getElementById('groupFilter').addEventListener('change', applyFilters);
+    </script>
+</body>
+</html>
