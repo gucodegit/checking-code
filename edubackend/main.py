@@ -9,9 +9,8 @@ import os
 import traceback
 import logging
 # ==========================================================
-# 1-я версия 
-# - Добавить новое занятие, Список всех занятий
-# - Нет методов для таблицы edudb.assignments
+# 2-я версия 
+# uvicorn main:app --reload --port 8081
 # ==========================================================
 
 # Настройка логирования
@@ -260,6 +259,20 @@ async def get_lessons_detailed():
     finally:
         cursor.close()
         conn.close()
+
+@app.get("/lessons/{lesson_id}")
+async def get_lesson(lesson_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM edudb.lessons WHERE lesson_id = %s", (lesson_id,))
+        lesson = cursor.fetchone()
+        if not lesson:
+            raise HTTPException(status_code=404, detail="Lesson not found")
+        return lesson
+    finally:
+        cursor.close()
+        conn.close()        
 
 # if __name__ == "__main__":
 #     import uvicorn
